@@ -1,0 +1,44 @@
+name: Deploy Angular to S3
+
+on:
+  push:
+    branches:
+      - master   # default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write   # required for OIDC
+      contents: read    # to checkout the code
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Angular app
+        run: npm run build -- --configuration production
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::899411342008:role/GitHubActions-Deploy-S3-CloudFront
+          aws-region: ap-south-1
+
+      - name: Deploy to S3
+        run: aws s3 sync dist/angular-project-deployment/browser/ s3://angular-assessment-serve --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E2GIN1H1ZNMYA8 \
+            --paths "/*"
