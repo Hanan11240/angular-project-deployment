@@ -3,11 +3,20 @@ name: Deploy Angular to S3
 on:
   push:
     branches:
-      - master   # default branch
+      - develop
+      - sit
+      - master   # prod branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    # 👇 Map branch → environment
+    environment: ${{ 
+      github.ref_name == 'develop' && 'dev' || 
+      github.ref_name == 'sit' && 'staging' || 
+      github.ref_name == 'master' && 'prod' 
+    }}
 
     permissions:
       id-token: write   # required for OIDC
@@ -35,9 +44,17 @@ jobs:
           aws-region: ap-south-1
 
       - name: Deploy to S3
-        run: aws s3 sync dist/angular-project-deployment/browser/ s3://angular-assessment-serve --delete
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "develop" ]]; then
+            aws s3 sync dist/angular-project-deployment/browser/ s3://angular-dev-bucket-serve --delete
+          elif [[ "${GITHUB_REF_NAME}" == "sit" ]]; then
+            aws s3 sync dist/angular-project-deployment/browser/ s3://angular-staging-bucket-serve --delete
+          else
+            aws s3 sync dist/angular-project-deployment/browser/ s3://angular-assessment-serve --delete
+          fi
 
       - name: Invalidate CloudFront cache
+        if: github.ref_name == 'master'   # only invalidate in prod
         run: |
           aws cloudfront create-invalidation \
             --distribution-id E2GIN1H1ZNMYA8 \
