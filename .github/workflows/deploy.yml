@@ -12,11 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     # 👇 Map branch → environment
-    environment: ${{ 
-      github.ref_name == 'develop' && 'dev' || 
-      github.ref_name == 'sit' && 'staging' || 
-      github.ref_name == 'master' && 'prod' 
-    }}
+    environment: ${{ github.ref_name == 'develop' ? 'dev' : github.ref_name == 'sit' ? 'staging' : 'prod' }}
+
 
     permissions:
       id-token: write   # required for OIDC
