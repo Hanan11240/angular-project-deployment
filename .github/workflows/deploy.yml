@@ -12,23 +12,10 @@ permissions:
   contents: read    # to checkout the code
 
 jobs:
-  deploy:
+  deploy-dev:
+    if: ${{ github.ref_name == 'develop' }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - branch: develop
-            environment: dev
-            bucket: angular-dev-bucket-serve
-          - branch: sit
-            environment: staging
-            bucket: angular-staging-bucket-serve
-          - branch: master
-            environment: prod
-            bucket: angular-assessment-serve
-            distribution_id: E2GIN1H1ZNMYA8   # only for prod
-    environment: ${{ matrix.environment }}
-    if: ${{ github.ref_name == matrix.branch }}
+    environment: dev
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,12 +37,67 @@ jobs:
           role-to-assume: arn:aws:iam::899411342008:role/GitHubActions-Deploy-S3-CloudFront
           aws-region: ap-south-1
 
-      - name: Deploy to S3
-        run: aws s3 sync dist/angular-project-deployment/browser/ s3://${{ matrix.bucket }} --delete
+      - name: Deploy to Dev S3
+        run: aws s3 sync dist/angular-project-deployment/browser/ s3://angular-dev-bucket-serve --delete
 
-      - name: Invalidate CloudFront cache (prod only)
-        if: ${{ matrix.branch == 'master' }}
+  deploy-staging:
+    if: ${{ github.ref_name == 'sit' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Angular app
+        run: npm run build -- --configuration production
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::899411342008:role/GitHubActions-Deploy-S3-CloudFront
+          aws-region: ap-south-1
+
+      - name: Deploy to Staging S3
+        run: aws s3 sync dist/angular-project-deployment/browser/ s3://angular-staging-bucket-serve --delete
+
+  deploy-prod:
+    if: ${{ github.ref_name == 'master' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Angular app
+        run: npm run build -- --configuration production
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::899411342008:role/GitHubActions-Deploy-S3-CloudFront
+          aws-region: ap-south-1
+
+      - name: Deploy to Prod S3
+        run: aws s3 sync dist/angular-project-deployment/browser/ s3://angular-assessment-serve --delete
+
+      - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ matrix.distribution_id }} \
+            --distribution-id E2GIN1H1ZNMYA8 \
             --paths "/*"
