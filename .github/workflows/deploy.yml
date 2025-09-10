@@ -59,6 +59,12 @@ jobs:
       - name: Build Angular app
         run: npm run build -- --configuration production
 
+      - name: Debug OIDC claims
+        run: |
+          echo "OIDC token claims:"
+          curl -s "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" | jq .
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
